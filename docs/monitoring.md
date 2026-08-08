@@ -81,7 +81,7 @@ Latency меряем по стадиям и сквозным путём. Ста�
 
 ## Расследование события через audit trail
 
-Формат записи задан в [../poc/facegate/audit.py](../poc/facegate/audit.py): одна строка JSON на решение, append-only, в PoC это `../poc/demo/events.jsonl`, в MVP таблица PostgreSQL без UPDATE и DELETE.
+Формат записи задан в [../poc/facegate/audit.py](../poc/facegate/audit.py): одна строка JSON на решение, append-only. В PoC журнал создаёт прогон `make demo` (`poc/out/access_log.jsonl`), в MVP это таблица PostgreSQL без UPDATE и DELETE.
 
 В записи лежат: `event_id`, `decision_id`, `audit_id`, `gate_id`, `camera_id`, `captured_at`, `decision`, список кодов `reasons`, `employee_id` (или пусто для `deny` без кандидата), `match_score`, `margin_to_second_best`, блок `quality` (`face_detected`, `quality_score`, `liveness_score`), флаг `degraded_mode` с `cache_age_minutes`, `next_action`, `turnstile_command`, `latency_ms` и версии модели, порогов и галереи.
 
