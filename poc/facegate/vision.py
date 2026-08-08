@@ -71,22 +71,24 @@ def assess(frame: np.ndarray, box: FaceBox, cfg: Config) -> QualityReport:
     return QualityReport(True, round(score, 3), round(sharpness, 1), round(brightness, 1), round(ratio, 4), reason)
 
 
-def liveness_score(frame: np.ndarray, box: FaceBox) -> float:
+def liveness_score(frame: np.ndarray, box: FaceBox) -> float | None:
     """Периодичность строк кадра: экран и печатный растр дают узкий пик в спектре.
 
     Сравниваем пик не со средним по полосе, а с медианой соседних бинов, иначе
-    гладкая пересвеченная фотография даёт ложный выброс.
+    гладкая пересвеченная фотография даёт ложный выброс. None означает, что на
+    таком кадре проверка не считается: движок решений обязан трактовать это как
+    отсутствие проверки, а не как пройденную проверку.
     """
     face = box.crop(frame).astype(np.float32)
     if face.shape[1] < 64:
-        return 0.0
+        return None
     rows = face - face.mean(axis=1, keepdims=True)
     spectrum = np.abs(np.fft.rfft(rows * np.hanning(rows.shape[1]), axis=1)).mean(axis=0)
     band = spectrum[8:]
     if band.size < 40:
-        return 0.0
+        return None
     peak_at = int(np.argmax(band))
     neighbours = np.concatenate([band[max(0, peak_at - 15) : max(0, peak_at - 4)], band[peak_at + 4 : peak_at + 15]])
     if neighbours.size == 0:
-        return 0.0
+        return None
     return float(band[peak_at] / (np.median(neighbours) + 1e-6))

@@ -38,9 +38,13 @@ class Pipeline:
         if event["event_id"] in self._decisions:
             answer = dict(self._decisions[event["event_id"]])
             answer["reasons"] = answer["reasons"] + ["idempotent_replay"]
-            answer["turnstile_command"] = "none"
-            # Решение не пересчитываем, но повтор пишем в журнал отдельной записью:
-            # без неё попытка переиграть событие не видна при разборе инцидента.
+            # Решение не пересчитываем, а команду отправляем повторно с тем же
+            # decision_id: от второго открытия защищает дедупликация на контроллере,
+            # и проверить её можно только отправив дубликат.
+            if answer["decision"] == "allow":
+                answer["turnstile_command"] = self.turnstile.open(answer["decision_id"])
+            # Повтор пишем в журнал отдельной записью, иначе попытка переиграть
+            # событие не видна при разборе инцидента.
             answer["audit_id"] = self.audit.write(answer)
             return answer
 
@@ -49,7 +53,7 @@ class Pipeline:
         self.cache.age_minutes = int(meta.get("cache_age_minutes", 0))
 
         quality = None
-        liveness = 0.0
+        liveness = None
         candidates = []
         attempts = 0
         while attempts < self.cfg.max_frames:
@@ -93,7 +97,7 @@ class Pipeline:
                 "quality_score": quality.quality_score if quality else 0.0,
                 "sharpness": quality.sharpness if quality else 0.0,
                 "brightness": quality.brightness if quality else 0.0,
-                "liveness_score": round(liveness, 2),
+                "liveness_score": round(liveness, 2) if liveness is not None else None,
             },
             "reasons": verdict.reasons,
             "frames_used": attempts,

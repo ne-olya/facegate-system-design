@@ -60,8 +60,36 @@ def test_replay_of_same_event_does_not_open_twice(pipeline):
     first = pipeline.process(EVENTS["e-1001"])
     second = pipeline.process(EVENTS["e-1001"])
     assert second["decision_id"] == first["decision_id"]
-    assert second["turnstile_command"] == "none"
+    # Команда уходит повторно, и от второго импульса защищает именно дедупликация
+    # по decision_id на контроллере, а не отсутствие вызова.
+    assert second["turnstile_command"] == "duplicate_ignored"
     assert len(pipeline.turnstile.opened) == 1
+
+
+def test_retry_recovers_when_next_frame_is_good(pipeline):
+    event = dict(EVENTS["e-1002"])
+    event["event_id"] = "e-1002-retry"
+    event["scene"] = dict(event["scene"], retry_recovers=True)
+    answer = pipeline.process(event)
+    assert answer["frames_used"] == 2
+    assert answer["quality"]["quality_score"] > 0
+
+
+def test_unmeasurable_liveness_never_opens():
+    from facegate.policy import decide
+    from facegate.gallery import Candidate
+    from facegate.vision import QualityReport
+
+    quality = QualityReport(True, 0.9, 400.0, 110.0, 0.09, "quality_ok")
+    verdict = decide(
+        quality=quality,
+        liveness=None,
+        candidates=[Candidate("emp-4821", 0.99), Candidate("emp-7730", 0.10)],
+        cache_mode="fresh",
+        revoked=False,
+    )
+    assert verdict.decision == "manual_review"
+    assert "liveness_not_measurable" in verdict.reasons
 
 
 def test_audit_log_keeps_reason_and_drops_biometrics(pipeline):

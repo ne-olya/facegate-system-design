@@ -49,16 +49,17 @@ def main() -> int:
     events.append(events[0])  # повтор первого события: проверяем идемпотентность
 
     print(f"галерея на edge: {len(cache.gallery)} сотрудников, вектор {embed.DIM}-D\n")
-    header = f"{'event':<8}{'решение':<15}{'сотрудник':<11}{'score':>7}{'margin':>8}{'liveness':>10}{'кадров':>8}{'команда':>17}  причины"
+    header = f"{'event':<8}{'решение':<15}{'сотрудник':<11}{'score':>7}{'margin':>8}{'liveness':>10}{'кадров':>8}{'команда':>19}  причины"
     print(header)
     print("-" * len(header))
     for event in events:
         answer = pipeline.process(event)
+        liveness = answer["quality"]["liveness_score"]
         print(
             f"{answer['event_id']:<8}{answer['decision']:<15}{answer['employee_id'] or '-':<11}"
             f"{answer['match_score'] or 0:>7.3f}{answer['margin_to_second_best'] or 0:>8.3f}"
-            f"{answer['quality']['liveness_score']:>10.1f}{answer['frames_used']:>8}"
-            f"{answer['turnstile_command']:>17}  {', '.join(answer['reasons'])}"
+            f"{(f'{liveness:.1f}' if liveness is not None else '-'):>10}{answer['frames_used']:>8}"
+            f"{answer['turnstile_command']:>19}  {', '.join(answer['reasons'])}"
         )
 
     print(f"\nтурникет открывался {len(pipeline.turnstile.opened)} раз(а)")

@@ -27,7 +27,7 @@ def _fail(decision: str, reason: str, action: str) -> Verdict:
 
 def decide(
     quality: QualityReport | None,
-    liveness: float,
+    liveness: float | None,
     candidates: list[Candidate],
     cache_mode: str,
     revoked: bool,
@@ -40,16 +40,22 @@ def decide(
     if quality is None:
         return _fail("deny", "face_not_detected", "use_card")
     if quality.reason != "quality_ok":
-        return _fail("manual_review", quality.reason, "go_to_guard")
+        # Кадр не годится, но человек, скорее всего, свой: ему быстрее приложить карту,
+        # чем ждать охрану. Событие всё равно уходит в очередь поста.
+        return _fail("manual_review", quality.reason, "use_card")
+    if liveness is None:
+        # Проверка живости не посчиталась. Нет проверки - нет автоматического прохода.
+        return _fail("manual_review", "liveness_not_measurable", "use_card")
     if liveness >= cfg.liveness.deny_above:
         return _fail("deny", "liveness_failed", "go_to_guard")
     if cache_mode == "dead":
-        return _fail("manual_review", "cache_expired", "go_to_guard")
+        return _fail("manual_review", "cache_expired", "use_card")
 
     reasons = ["quality_ok"]
     reasons.append("liveness_ok" if liveness < cfg.liveness.ok_below else "liveness_uncertain")
 
     if not candidates:
+        # Лицо есть, а в галерее площадки такого человека нет: это уже к посту.
         return _fail("deny", "no_candidates", "go_to_guard")
 
     top = candidates[0]
@@ -61,7 +67,8 @@ def decide(
         employee_id=top.employee_id,
         match_score=round(top.score, 4),
         margin_to_second_best=margin,
-        next_action="go_to_guard",
+        # Сомнительный случай не означает подозрительного человека: карта быстрее охраны.
+        next_action="use_card",
     )
 
     if revoked:
