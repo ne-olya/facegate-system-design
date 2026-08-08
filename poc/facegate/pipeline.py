@@ -39,6 +39,9 @@ class Pipeline:
             answer = dict(self._decisions[event["event_id"]])
             answer["reasons"] = answer["reasons"] + ["idempotent_replay"]
             answer["turnstile_command"] = "none"
+            # Решение не пересчитываем, но повтор пишем в журнал отдельной записью:
+            # без неё попытка переиграть событие не видна при разборе инцидента.
+            answer["audit_id"] = self.audit.write(answer)
             return answer
 
         started = time.perf_counter()

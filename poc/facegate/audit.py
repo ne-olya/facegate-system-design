@@ -12,9 +12,13 @@ class AuditLog:
     def __init__(self, path: Path) -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Нумерация продолжает существующий файл: audit_id должен быть уникален на
+        # запись, а не на решение, иначе повтор события неотличим от оригинала.
+        self._written = len(self.records())
 
     def write(self, record: dict) -> str:
-        audit_id = f"a-{abs(hash(record['decision_id'])) % 10**6}"
+        self._written += 1
+        audit_id = f"a-{self._written:05d}"
         line = dict(record, audit_id=audit_id)
         with self.path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(line, ensure_ascii=False) + "\n")
